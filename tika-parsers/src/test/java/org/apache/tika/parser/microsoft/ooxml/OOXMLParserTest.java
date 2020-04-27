@@ -31,6 +31,7 @@ import java.io.File;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.StringWriter;
+import java.nio.file.Path;
 import java.text.DecimalFormatSymbols;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -42,6 +43,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.ctakes.typesystem.type.syntax.O;
 import org.apache.poi.util.LocaleUtil;
 import org.apache.tika.TikaTest;
 import org.apache.tika.config.TikaConfig;
@@ -1757,6 +1759,35 @@ public class OOXMLParserTest extends TikaTest {
         m = getXML("testPPT_signed.pptx").metadata;
         assertEquals("true", m.get(TikaCoreProperties.HAS_SIGNATURE));
 
+    }
+
+    @Test(expected = org.apache.tika.exception.TikaException.class)
+    public void testTruncatedSAXDocx() throws Exception {
+        ParseContext pc = new ParseContext();
+        OfficeParserConfig c = new OfficeParserConfig();
+        c.setUseSAXDocxExtractor(true);
+        pc.set(OfficeParserConfig.class, c);
+        getRecursiveMetadata("testWORD_truncated.docx", pc);
+    }
+
+    @Test
+    public void testDateFormat() throws Exception {
+        TikaConfig tikaConfig = new TikaConfig(
+                this.getClass().getResourceAsStream("tika-config-custom-date-override.xml"));
+        Parser p = new AutoDetectParser(tikaConfig);
+        String xml = getXML("testEXCEL_dateFormats.xlsx", p).xml;
+        assertContains("2018-09-20", xml);
+        assertContains("1996-08-10", xml);
+    }
+
+    @Test
+    public void testDocSecurity() throws Exception {
+        assertEquals(OfficeOpenXMLExtended.SECURITY_PASSWORD_PROTECTED,
+                getRecursiveMetadata("protectedFile.xlsx")
+                .get(0).get(OfficeOpenXMLExtended.DOC_SECURITY_STRING));
+        assertEquals(OfficeOpenXMLExtended.SECURITY_READ_ONLY_ENFORCED,
+                getRecursiveMetadata("testWORD_docSecurity.docx")
+                        .get(0).get(OfficeOpenXMLExtended.DOC_SECURITY_STRING));
     }
 }
 

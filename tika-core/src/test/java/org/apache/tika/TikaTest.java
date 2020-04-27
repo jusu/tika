@@ -29,8 +29,11 @@ import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -42,6 +45,7 @@ import org.apache.tika.metadata.Metadata;
 import org.apache.tika.metadata.TikaCoreProperties;
 import org.apache.tika.mime.MediaType;
 import org.apache.tika.parser.AutoDetectParser;
+import org.apache.tika.parser.CompositeParser;
 import org.apache.tika.parser.ParseContext;
 import org.apache.tika.parser.Parser;
 import org.apache.tika.parser.RecursiveParserWrapper;
@@ -254,6 +258,11 @@ public abstract class TikaTest {
             return getRecursiveMetadata(tis, new ParseContext(), new Metadata(), suppressException);
         }
     }
+    protected List<Metadata> getRecursiveMetadata(Path filePath) throws Exception {
+        try (TikaInputStream tis = TikaInputStream.get(filePath)) {
+            return getRecursiveMetadata(tis, true);
+        }
+    }
 
     protected List<Metadata> getRecursiveMetadata(InputStream is, boolean suppressException) throws Exception {
         return getRecursiveMetadata(is, new ParseContext(), new Metadata(), suppressException);
@@ -448,7 +457,9 @@ public abstract class TikaTest {
     public static void debug(List<Metadata> list) {
         int i = 0;
         for (Metadata m : list) {
-            for (String n : m.names()) {
+            List<String> names = Arrays.asList(m.names());
+            Collections.sort(names);
+            for (String n : names) {
                 for (String v : m.getValues(n)) {
                     System.out.println(i + ": "+n + " : "+v);
                 }
@@ -458,10 +469,42 @@ public abstract class TikaTest {
     }
 
     public static void debug(Metadata metadata) {
-        for (String n : metadata.names()) {
+        List<String> names = Arrays.asList(metadata.names());
+        Collections.sort(names);
+        for (String n : names) {
             for (String v : metadata.getValues(n)) {
                 System.out.println(n + " : "+v);
             }
+        }
+    }
+
+    public static Parser findParser(Parser parser, Class clazz) {
+        if (parser instanceof CompositeParser) {
+            for (Parser child : ((CompositeParser)parser).getAllComponentParsers()) {
+                Parser found = findParser(child, clazz);
+                if (found != null) {
+                    return found;
+                }
+            }
+        } else if (clazz.isInstance(parser)) {
+            return parser;
+        }
+        return null;
+    }
+
+    public List<Path> getAllTestFiles() {
+        //for now, just get main files
+        //TODO: fix this to be recursive
+        try {
+            File[] pathArray = Paths.get(this.getClass().getResource("/test-documents")
+                    .toURI()).toFile().listFiles();
+            List<Path> paths = new ArrayList<>();
+            for (File f : pathArray) {
+                paths.add(f.toPath());
+            }
+            return paths;
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
         }
     }
 }
